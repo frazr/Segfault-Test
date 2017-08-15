@@ -1,0 +1,19 @@
+/var/log/nginx/*.log {
+        weekly
+        rotate 54
+        compress
+        delaycompress
+        missingok
+}
+
+/data/logs/*access_log /data/logs/*error_log {
+        weekly
+        rotate 54
+        compress
+        delaycompress
+        missingok
+        sharedscripts
+        postrotate
+        supervisorctl restart nginx > /dev/null
+        endscript
+}

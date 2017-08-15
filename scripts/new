@@ -1,0 +1,125 @@
+#!/bin/bash
+
+username=$1
+domain=$2
+
+usage="Usage: new [username] [domain]"
+regex_username=^[0-9a-z_]+$
+regex_domain=^[0-9a-z\.\-]+$
+
+if [[ ! $username =~ $regex_username ]] || [[ ! $domain =~ $regex_domain ]]; then
+    echo $usage
+    exit
+fi
+
+id -u $username > /dev/null 2>&1
+user_exists=$?
+
+if [ $user_exists -eq 0 ]; then
+    echo "Error: user exists"
+    exit
+fi
+
+pass=$(pwgen)
+
+datadir="/data"
+homedir="$datadir/sites/$username"
+logsdir="$datadir/logs"
+webrootdir="$homedir/public_html"
+userlogsdir="$homedir/logs"
+
+mkdir -p $webrootdir
+mkdir -p $userlogsdir
+
+
+addgroup $username
+useradd $username --home $homedir -g $username --shell /bin/bash
+echo "$username:$pass" | chpasswd
+adduser www-data $username
+
+chmod -R 755 $homedir
+echo "<?php echo 'SITE OK'; ?>" > "$webrootdir/index.php"
+chown -R $username. $homedir
+
+# Shared hosts
+echo "127.0.0.1 $domain" >> /data/etc/hosts
+echo "127.0.0.1 www.$domain" >> /data/etc/hosts
+echo "127.0.0.1 $username.localhosting.com" >> /data/etc/hosts
+
+# Local hosts
+echo "127.0.0.1 $domain" >> /etc/hosts
+echo "127.0.0.1 www.$domain" >> /etc/hosts
+echo "127.0.0.1 $username.localhosting.com" >> /etc/hosts
+
+cat > "$datadir/php-fpm.d/$username.conf" << EOF
+[$username]
+user = $username
+group = $username
+prefix = $homedir
+listen = /var/run/php-fpm-$username.sock
+listen.owner = www-data
+listen.group = www-data 
+php_admin_value[disable_functions] = exec,passthru,shell_exec,system
+pm = dynamic
+pm.max_children = 2
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 2
+chdir = $homedir/public_html
+EOF
+
+cat > "$datadir/nginx.d/$username.conf" << EOF
+server {
+    listen 80;
+
+    root $webrootdir;
+    index index.php index.html index.htm;
+
+    server_name $domain www.$domain $username.localhosting.com;
+
+		access_log $logsdir/${domain}_access_log;
+		error_log $logsdir/${domain}_error_log;
+
+    location ~ \.php$ {
+        fastcgi_split_path_info ^(.+\.php)(/.+)$;
+        fastcgi_pass unix:/var/run/php-fpm-$username.sock; 
+				fastcgi_index index.php;
+				fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+    include restrictions;
+		include wordpress;
+}
+EOF
+
+touch $logsdir/${domain}_access_log
+touch $logsdir/${domain}_error_log
+
+chown $username:www-data $logsdir/${domain}_access_log
+chown $username:www-data $logsdir/${domain}_error_log
+
+chmod 660 $logsdir/${domain}_access_log
+chmod 660 $logsdir/${domain}_error_log
+
+ln -s "$logsdir/${domain}_access_log" "$userlogsdir/access_log"
+ln -s "$logsdir/${domain}_error_log" "$userlogsdir/error_log"
+
+chown -h $username:$username "$userlogsdir/access_log"
+chown -h $username:$username "$userlogsdir/error_log"
+
+echo "CREATE DATABASE $username character set utf8mb4 collate utf8mb4_swedish_ci; CREATE USER '$username'@'%' IDENTIFIED BY '$pass'; GRANT ALL PRIVILEGES ON $username.* TO '$username'@'%'; FLUSH PRIVILEGES;" | mysql -u root -p'dev' -hdb
+
+supervisorctl restart php-fpm7
+supervisorctl restart nginx
+
+echo -e "----------------------"
+echo -e "Username: $username"
+echo -e "Password: $pass"
+echo -e "Webroot: $webrootdir"
+
+# Transfer new user & changes to shared folder
+cp /etc/passwd /data/etc/
+cp /etc/shadow /data/etc/
+cp /etc/group /data/etc/
+
+send-router-domains

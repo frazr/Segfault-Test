@@ -1,0 +1,23 @@
+version: '2'
+services:
+  web:
+    build: ./
+    image: eu.gcr.io/project/image
+    privileged: true 
+    volumes:
+     - "../../docker_volumes/developer:/data"
+    ports:
+     - "80:80"
+    links:
+     - "db:db"
+  db:
+    image: mysql
+    ports:
+     - "3306:3306"
+    environment:
+     MYSQL_ROOT_PASSWORD: dev
+     MYSQL_USER: dev
+     MYSQL_PASSWORD: dev
+     MYSQL_DATABASE: dev
+    volumes:
+     - "../../docker_volumes/developer_mysql:/var/lib/mysql"

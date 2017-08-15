@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Generate private public ssh-keys
+if [ ! -f "$HOME/.ssh/id_rsa" ] && [ ! -f "$HOME/.ssh/id_rsa.pub" ]; then
+        ssh-keygen -b 4096
+fi
+
+read -e -p "Enter remote SSH host: " ssh_host
+read -e -p "Enter remote SSH username: " ssh_user
+read -e -p "Enter remote SSH port: " ssh_port
+
+# REMOTE SSH
+
+if [ -z "$ssh_user" ]; then
+        echo -e "Config: SSH Username missing"
+        echo $ssh_user
+        exit
+fi
+
+if [ -z "$ssh_host" ]; then
+        echo -e "Config: SSH Host is missing"
+        exit
+fi
+
+if [ -z "$ssh_port" ]; then
+        echo -e "Config: SSH Port missing"
+        exit
+fi
+
+ssh-copy-id -p $ssh_port -i "$HOME/.ssh/id_rsa" $ssh_user@$ssh_host &>/dev/null
+
+# REMOTE DATABASE
+read -p "Enter path for wp-config.php [~/public_html]: " wp_config_path
+
+if [ -z "$wp_config_path" ]; then
+        wp_config_path="~/public_html"
+fi
+
+# INIT
+db_details="cat $wp_config_path/wp-config.php"
+rsync -rvz -e 'ssh -p '$ssh_port' -i '$HOME/.ssh/id_rsa --progress $ssh_user@$ssh_host:$wp_config_path/* .
+
+eval $(awk -F "[()']" '/^define\(/{printf "%s='\''%s'\''\n", $3, $5;}' < wp-config.php | grep DB_*)
+
+if [ -z "$DB_USER" ]; then
+        echo -e "Config: RDB user missing"
+        exit
+fi
+
+if [ -z "$DB_PASSWORD" ]; then
+        echo -e "Config: RDB password missing"
+        exit
+fi
+
+if [ -z "$DB_NAME" ]; then
+        echo -e "Config: RDB name missing"
+        exit
+fi
+
+dump="mysqldump -u $DB_USER --password='$DB_PASSWORD' $DB_NAME"
+
+current_user=$(whoami)
+
+read -p "Enter your LOCAL database user [$current_user]: " local_db_user
+
+if [ -z "$local_db_user" ]; then
+        local_db_user="$current_user"
+fi
+
+read -p "Enter your LOCAL database name [$current_user]: " local_db_name
+
+if [ -z "$local_db_name" ]; then
+        local_db_name="$current_user"
+fi
+
+read -s -p "Enter your local database password: " local_db_password
+
+printf "\033c"
+
+ssh $ssh_user@$ssh_host -p $ssh_port $dump | mysql -u $local_db_user --password=$local_db_password -hdb $local_db_name
+
+sed -i -e "s;\(define([[:space:]]*'DB_USER',[[:space:]]*\)\(.*\)\()\;\);\1'$local_db_user'\3;g" wp-config.php
+sed -i -e "s;\(define([[:space:]]*'DB_PASSWORD',[[:space:]]*\)\(.*\)\()\;\);\1'$local_db_password'\3;g" wp-config.php
+sed -i -e "s;\(define([[:space:]]*'DB_NAME',[[:space:]]*\)\(.*\)\()\;\);\1'$local_db_name'\3;g" wp-config.php
+sed -i -e "s;\(define([[:space:]]*'DB_HOST',[[:space:]]*\)\(.*\)\()\;\);\1'127.0.0.1'\3;g" wp-config.php
+
+echo -e "Database imported to: $local_db_name"
+echo -e "Cleaning up..."
+
+# CLEANING UP
+
+# This is bad, and should NEVER be used on hosts with active pub/private key authentication.
+ssh $ssh_user@$ssh_host -p $ssh_port 'echo "" > $HOME/.ssh/authorized_keys'
+
+echo -e "Exiting"
