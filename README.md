@@ -73,3 +73,8 @@ echo "rlimit_core = unlimited" >> /data/php-fpm.d/example.conf
 supervisorctl restart php-fpm7
 ```
 
+### Access site
+
+To be able to access the site you need to set up the /etc/hosts file on your local machine with a record of the example.com domain.
+
+127.0.0.1 example.com
