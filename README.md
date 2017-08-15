@@ -58,7 +58,7 @@ docker-compose exec web bash
 new example example.com
 
 # Proceed and install wordpress in the /data/sites/example/public_html folder
-# Set up wp-config to connect to db. Both user, password & database name is "example"
+# Set up wp-config to connect to db. With the details from the output of the "new" command.
 
 # Enable Core Dump format
 echo '/tmp/coredump-%e.%p' > /proc/sys/kernel/core_pattern
