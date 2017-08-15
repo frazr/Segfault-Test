@@ -8,6 +8,16 @@ Docker version 17.03.1-ce, build c6d412e
 
 Install the required dependencied (docker-compose & docker-engine).
 
+Build the container
+
+```sh
+# Builds the container
+docker-compose build
+
+# Brings the container up and detaches it
+docker-compose up -d 
+```
+
 ### docker-compose.yml
 ```sh
 version: '2'
