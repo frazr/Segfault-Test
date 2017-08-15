@@ -43,10 +43,10 @@ I'm using a folder named "my_volumes" beneath the working directory to store the
 docker-compose exec web bash
 
 # Inside the container type
-new site example.com
+new example example.com
 
-# Proceed and install wordpress in the /data/sites/site/public_html folder
-# Set up wp-config to connect to db with details in the docker-compose.yml file
+# Proceed and install wordpress in the /data/sites/example/public_html folder
+# Set up wp-config to connect to db. Both user, password & database name is "example"
 
 # Enable Core Dump format
 echo '/tmp/coredump-%e.%p' > /proc/sys/kernel/core_pattern
@@ -55,7 +55,7 @@ echo '/tmp/coredump-%e.%p' > /proc/sys/kernel/core_pattern
 ulimit -c
 
 # Add rlimit to your PHP-FPM pool configuration
-echo "rlimit_core = unlimited" >> /data/php-fpm.d/site.conf
+echo "rlimit_core = unlimited" >> /data/php-fpm.d/example.conf
 
 # Restart php-fpm7
 supervisorctl restart php-fpm7
