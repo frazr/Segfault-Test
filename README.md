@@ -8,16 +8,6 @@ Docker version 17.03.1-ce, build c6d412e
 
 Install the required dependencied (docker-compose & docker-engine).
 
-Build the container
-
-```sh
-# Builds the container
-docker-compose build
-
-# Brings the container up and detaches it
-docker-compose up -d 
-```
-
 ### docker-compose.yml
 ```sh
 version: '2'
@@ -44,7 +34,19 @@ services:
      - "../my_volumes/data_mysql:/var/lib/mysql"
 ```
 
+
+
 I'm using a folder named "my_volumes" beneath the working directory to store the container data. Set this up according to your local environment.
+
+### Building container
+
+```sh
+# Builds the container
+docker-compose build
+
+# Brings the container up and detaches it
+docker-compose up -d 
+```
 
 ### Creating your site
 
